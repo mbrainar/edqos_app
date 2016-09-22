@@ -17,6 +17,7 @@ from flask import g
 import apic
 import sqlite3
 import os
+import requests
 
 
 
@@ -24,67 +25,27 @@ app = Flask(__name__)
 app.config.from_object(__name__)
 
 app.config.update(dict(
-    DATABASE=os.path.join(app.root_path, 'edqos.db'),
-    SECRET_KEY='devel key'
+    EDQOS_DATA_SERVER='localhost'
 ))
 
-if os.environ.get("SECRET_KEY"):
+if os.environ.get("EDQOS_DATA_SERVER"):
     app.config.update(dict(
-        SECRET_KEY=os.environ.get("SECRET_KEY")
+        EDQOS_DATA_SERVER=os.environ.get("EDQOS_DATA_SERVER")
     ))
 
-def dict_factory(cursor, row):
-    d = {}
-    for idx,col in enumerate(cursor.description):
-        d[col[0]] = row[idx]
-    return d
-
-def connect_db():
-    rv = sqlite3.connect(app.config['DATABASE'])
-    rv.row_factory = dict_factory
-    return rv
-
-
-def get_db():
-    if not hasattr(g, 'sqlite_db'):
-        g.sqlite_db = connect_db()
-    return g.sqlite_db
-
-
-def init_db():
-    db = get_db()
-    with app.open_resource('schema.sql', mode='r') as f:
-        db.cursor().executescript(f.read())
-    db.commit()
-
-
-@app.cli.command('initdb')
-def initdb_command():
-    init_db()
-    print 'Database initialized'
-
-
-@app.teardown_appcontext
-def close_db(error):
-    if hasattr(g, 'sqlite_db'):
-        g.sqlite_db.close()
-
-
-@app.route('/')
-def home():
-    policy_tag = request.args.get('selected')
-    policies = apic.get_policy_scope(apic.get_ticket())
-    return render_template('index.html', policies=policies, policy_tag=policy_tag,
-                               title='Event Driven QoS')
-
+def get_dataserv():
+    if not hasattr(g, 'data_server'):
+        g.app_server = "http://" + app.config['EDQOS_DATA_SERVER']
+    return g.data_server
 
 @app.route('/_get_apps/')
 def get_apps():
     pol = request.args.get('policy')
-    db = get_db()
-    cur = db.execute('select id, policy, app from edqos where policy = ?', tuple([pol]))
-    entries = cur.fetchall()
+    # get the app list from the data server
+    req_url = get_dataserv() + "/_get_apps_db?policy=" + pol
+    entries = requests.get(req_url)
     return jsonify(map(dict, entries))
+
 
 @app.route('/_is_relevant/')
 def check_relevant():
@@ -95,25 +56,18 @@ def check_relevant():
     policy = apic.get_policy(ticket, policy_tag)
     return apic.get_app_state(policy, app_id, app)
 
-@app.route('/configure/')
-def configure():
-    policy = request.args.get('policy')
-    app_list = apic.get_applications(apic.get_ticket(),policy)
-    db = get_db()
-    cur = db.execute('select id, policy, app from edqos where policy = ?', tuple([policy]))
-    entries = cur.fetchall()
-    selected_apps = []
-    for item in entries:
-        selected_apps.append(item['app'])
-    return render_template('configure.html', apps=app_list, policy=policy,
-                           selected_apps=selected_apps,
-                           title='Event Driven QoS Configuration')
+
+@app.route('/get_policy_scope/')
+def get_policy_scope():
+    return apic.get_policy_scope(apic.get_ticket())
+
 
 @app.route('/_save_config/', methods=["POST"])
 def save_config():
     applist = request.form.getlist('selections')
     policy_tag = request.form.getlist('policy_tag')[0]
     apps = applist[0].split(",")
+    # map this to the data server
     db = get_db()
     cur = db.execute('delete from edqos')
     for item in apps:
@@ -123,18 +77,13 @@ def save_config():
     return jsonify(applist)
 
 
-@app.errorhandler(404)
-def not_found(error):
-    return render_template('error.html', title='Oops.'), 404
-
 
 @app.route('/event/on/')
 def event_on():
     policy_scope = request.args.get('policy')
     event_status = True
-    db = get_db()
-    cur = db.execute('select app from edqos where policy = ?', tuple([policy_scope]))
-    saved_apps = cur.fetchall()
+    req_url = get_dataserv() + "/_get_apps_db?policy=" + policy_scope
+    saved_apps = requests.get(req_url)
     app_list = []
     for app in saved_apps:
         app_list.append(app['app'])
@@ -152,9 +101,8 @@ def event_on():
 def event_off():
     policy_scope = request.args.get('policy')
     event_status = False
-    db = get_db()
-    cur = db.execute('select app from edqos where policy = ?', tuple([policy_scope]))
-    saved_apps = cur.fetchall()
+    req_url = get_dataserv() + "/_get_apps_db?policy=" + policy_scope
+    saved_apps = requests.get(req_url)
     app_list = []
     for app in saved_apps:
         app_list.append(app['app'])
