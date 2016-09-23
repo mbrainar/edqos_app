@@ -46,6 +46,7 @@ def get_apps():
     pol = request.args.get('policy')
     # get the app list from the data server
     req_url = get_dataserv() + "/_get_apps_db?policy=" + pol
+    print "requesting " + req_url
     entries = requests.get(req_url)
     return jsonify(map(dict, entries))
 
