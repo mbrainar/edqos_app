@@ -35,8 +35,11 @@ if os.environ.get("EDQOS_DATA_SERVER"):
 
 def get_dataserv():
     if not hasattr(g, 'data_server'):
-        g.app_server = "http://" + app.config['EDQOS_DATA_SERVER']
+        g.data_server = "http://" + app.config['EDQOS_DATA_SERVER']
     return g.data_server
+
+# These API calls retrieve information from the data/configuration
+# service.
 
 @app.route('/_get_apps/')
 def get_apps():
@@ -46,6 +49,8 @@ def get_apps():
     entries = requests.get(req_url)
     return jsonify(map(dict, entries))
 
+
+# These API calls retrieve information from the APIC-EM.
 
 @app.route('/_is_relevant/')
 def check_relevant():
@@ -61,6 +66,9 @@ def check_relevant():
 def get_policy_scope():
     return apic.get_policy_scope(apic.get_ticket())
 
+
+# These API calls are used by the config/status UI to manipulate
+# app state and the configuration.
 
 @app.route('/_save_config/', methods=["POST"])
 def save_config():
@@ -116,6 +124,7 @@ def event_off():
                                   policy_scope)
 
 
+# Currently unused call to the weather plugin
 
 @app.route('/weather/')
 def check_weather():
