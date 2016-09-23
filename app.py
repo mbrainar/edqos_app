@@ -46,9 +46,11 @@ def get_apps():
     pol = request.args.get('policy')
     # get the app list from the data server
     req_url = get_dataserv() + "/_get_apps_db?policy=" + pol
-    print "requesting " + req_url
     entries = requests.get(req_url)
-    return jsonify(map(dict, entries))
+    if len(entries.text)>3:
+        return jsonify(map(dict, entries))
+    else:
+        return ""
 
 
 # These API calls retrieve information from the APIC-EM.
@@ -60,12 +62,14 @@ def check_relevant():
     ticket = apic.get_ticket()
     app_id = apic.get_app_id(ticket, app)
     policy = apic.get_policy(ticket, policy_tag)
-    return apic.get_app_state(policy, app_id, app)
+    return jsonify(apic.get_app_state(policy, app_id, app))
 
 
-@app.route('/get_policy_scope/')
+@app.route('/_get_policy_scope/')
 def get_policy_scope():
-    return apic.get_policy_scope(apic.get_ticket())
+    result = apic.get_policy_scope(apic.get_ticket())
+    print jsonify(result)
+    return jsonify(result)
 
 
 # These API calls are used by the config/status UI to manipulate
