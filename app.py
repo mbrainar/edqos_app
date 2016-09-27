@@ -14,18 +14,22 @@ from flask import url_for
 from flask import jsonify
 from flask import request
 from flask import g
+from flask_restful import Resource, Api
 import apic
 import sqlite3
 import os
 import requests
+import json
 
 
 
 app = Flask(__name__)
+api = Api(app)
+
 app.config.from_object(__name__)
 
 app.config.update(dict(
-    EDQOS_DATA_SERVER='localhost'
+    EDQOS_DATA_SERVER='localhost:5002'
 ))
 
 if os.environ.get("EDQOS_DATA_SERVER"):
@@ -41,92 +45,93 @@ def get_dataserv():
 # These API calls retrieve information from the data/configuration
 # service.
 
-@app.route('/_get_apps/')
-def get_apps():
-    pol = request.args.get('policy')
-    # get the app list from the data server
-    req_url = get_dataserv() + "/_get_apps_db?policy=" + pol
-    entries = requests.get(req_url)
-    if len(entries.text)>3:
-        return jsonify(map(dict, entries))
-    else:
-        return ""
+class GetApps(Resource):
+    def get(self):
+        pol = request.args.get('policy')
+        # get the app list from the data server
+        req_url = get_dataserv() + "/_get_apps_db/?policy=" + pol
+        entries = requests.get(req_url)
+        return entries.json()
 
 
 # These API calls retrieve information from the APIC-EM.
 
-@app.route('/_is_relevant/')
-def check_relevant():
-    app = request.args.get('app')
-    policy_tag = request.args.get('policy')
-    ticket = apic.get_ticket()
-    app_id = apic.get_app_id(ticket, app)
-    policy = apic.get_policy(ticket, policy_tag)
-    return jsonify(apic.get_app_state(policy, app_id, app))
+class CheckIsRelevant(Resource):
+    def get(self):
+        app = request.args.get('app')
+        policy_tag = request.args.get('policy')
+        ticket = apic.get_ticket()
+        app_id = apic.get_app_id(ticket, app)
+        policy = apic.get_policy(ticket, policy_tag)
+        return apic.get_app_state(policy, app_id, app)
 
 
-@app.route('/_get_policy_scope/')
-def get_policy_scope():
-    result = apic.get_policy_scope(apic.get_ticket())
-    print jsonify(result)
-    return jsonify(result)
+
+class GetPolicyScope(Resource):
+    def get(self):
+        return apic.get_policy_scope(apic.get_ticket())
+
+
+class GetApplications(Resource):
+    def get(self):
+        policy_tag = request.args.get('policy')
+        result = apic.get_applications(apic.get_ticket(), policy_tag)
+        return result
 
 
 # These API calls are used by the config/status UI to manipulate
 # app state and the configuration.
 
-@app.route('/_save_config/', methods=["POST"])
-def save_config():
-    applist = request.form.getlist('selections')
-    policy_tag = request.form.getlist('policy_tag')[0]
-    apps = applist[0].split(",")
-    # map this to the data server
-    db = get_db()
-    cur = db.execute('delete from edqos')
-    for item in apps:
-        cur = db.execute('insert into edqos (policy, app) values (?,?)',
-            [policy_tag, item])
-    db.commit()
-    return jsonify(applist)
+class SaveConfig(Resource):
+    def post(self):
+        applist = request.form.getlist('selections')
+        policy_tag = request.form.getlist('policy_tag')[0]
+        apps = applist[0].split(",")
+        # map this to the data server
+        req_url = get_dataserv() + "/_save_config_db/"
+        payload = { "selections": applist,
+                    "policy_tag": policy_tag }
+        response = requests.post(req_url, data=payload)
+        return
 
 
 
-@app.route('/event/on/')
-def event_on():
-    policy_scope = request.args.get('policy')
-    event_status = True
-    req_url = get_dataserv() + "/_get_apps_db?policy=" + policy_scope
-    saved_apps = requests.get(req_url)
-    app_list = []
-    for app in saved_apps:
-        app_list.append(app['app'])
-    #return str(app_list)
-    service_ticket = apic.get_ticket()
-    return apic.put_policy_update(service_ticket,
-                                  apic.update_app_state(service_ticket,
-                                                        event_status,
-                                                        apic.get_policy(service_ticket, policy_scope),
-                                                        app_list),
-                                  policy_scope)
+class EventOn(Resource):
+    def get(self):
+        policy_scope = request.args.get('policy')
+        event_status = True
+        req_url = get_dataserv() + "/_get_apps_db/?policy=" + policy_scope
+        saved_apps = requests.get(req_url)
+        app_list = []
+        for app in saved_apps:
+            app_list.append(app['app'])
+        #return str(app_list)
+        service_ticket = apic.get_ticket()
+        return apic.put_policy_update(service_ticket,
+                                      apic.update_app_state(service_ticket,
+                                                            event_status,
+                                                            apic.get_policy(service_ticket, policy_scope),
+                                                            app_list),
+                                      policy_scope)
 
 
-@app.route('/event/off/')
-def event_off():
-    policy_scope = request.args.get('policy')
-    event_status = False
-    req_url = get_dataserv() + "/_get_apps_db?policy=" + policy_scope
-    saved_apps = requests.get(req_url)
-    app_list = []
-    for app in saved_apps:
-        app_list.append(app['app'])
-    # return str(app_list)
-    service_ticket = apic.get_ticket()
-    return apic.put_policy_update(service_ticket,
-                                  apic.update_app_state(service_ticket,
-                                                        event_status,
-                                                        apic.get_policy(service_ticket, policy_scope),
-                                                        app_list),
-                                  policy_scope)
+class EventOff(Resource):
+    def get(self):
+        policy_scope = request.args.get('policy')
+        event_status = False
+        req_url = get_dataserv() + "/_get_apps_db/?policy=" + policy_scope
+        saved_apps = requests.get(req_url)
+        app_list = []
+        for app in saved_apps:
+            app_list.append(app['app'])
+        # return str(app_list)
+        service_ticket = apic.get_ticket()
+        return apic.put_policy_update(service_ticket,
+                                      apic.update_app_state(service_ticket,
+                                                            event_status,
+                                                            apic.get_policy(service_ticket, policy_scope),
+                                                            app_list),
+                                      policy_scope)
 
 
 # Currently unused call to the weather plugin
@@ -141,5 +146,14 @@ def check_weather():
     return weather_string
 
 
+api.add_resource(GetApplications, '/_get_applications/')
+api.add_resource(GetPolicyScope, '/_get_policy_scope/')
+api.add_resource(CheckIsRelevant, '/_is_relevant/')
+api.add_resource(GetApps, '/_get_apps/')
+api.add_resource(SaveConfig, '/_save_config_db/')
+api.add_resource(EventOn,'/event/on/')
+api.add_resource(EventOff, '/event/off')
+
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5001)

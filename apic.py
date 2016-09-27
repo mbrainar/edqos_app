@@ -15,12 +15,25 @@ import os
 import json
 
 # Define global variables
-apic = os.environ.get("APIC_SERVER")
+if os.environ.get("APIC_SERVER"):
+    apic=os.environ.get("APIC_SERVER")
+else:
+    apic='sandboxapic.cisco.com'
+
+if os.environ.get("APIC_USERNAME"):
+    username=os.environ.get("APIC_USERNAME")
+else:
+    username='devnetuser'
+
+if os.environ.get("APIC_PASSWORD"):
+    password=os.environ.get("APIC_PASSWORD")
+else:
+    password='Cisco123!'
+
+
 
 # Get the service ticket to be used in API calls
 def get_ticket():
-    username = os.environ.get('APIC_USERNAME')
-    password = os.environ.get('APIC_PASSWORD')
 
     reqUrl = "https://{0}/api/v1/ticket".format(apic)
     payload = {'username': username, 'password': password}
