@@ -101,7 +101,7 @@ class EventOn(Resource):
         policy_scope = request.args.get('policy')
         event_status = True
         req_url = get_dataserv() + "/_get_apps_db/?policy=" + policy_scope
-        saved_apps = requests.get(req_url)
+        saved_apps = requests.get(req_url, verify=False)
         app_list = []
         for app in saved_apps:
             app_list.append(app['app'])
@@ -120,7 +120,7 @@ class EventOff(Resource):
         policy_scope = request.args.get('policy')
         event_status = False
         req_url = get_dataserv() + "/_get_apps_db/?policy=" + policy_scope
-        saved_apps = requests.get(req_url)
+        saved_apps = requests.get(req_url, verify=False)
         app_list = []
         for app in saved_apps:
             app_list.append(app['app'])
