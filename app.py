@@ -101,11 +101,10 @@ class EventOn(Resource):
         policy_scope = request.args.get('policy')
         event_status = True
         req_url = get_dataserv() + "/_get_apps_db/?policy=" + policy_scope
-        saved_apps = requests.get(req_url, verify=False)
+        saved_apps = requests.get(req_url, verify=False).json()
         app_list = []
-        for app in saved_apps:
-            app_list.append(app['app'])
-        #return str(app_list)
+        for item in saved_apps:
+            app_list.append(item['app'])
         service_ticket = apic.get_ticket()
         return apic.put_policy_update(service_ticket,
                                       apic.update_app_state(service_ticket,
@@ -120,11 +119,10 @@ class EventOff(Resource):
         policy_scope = request.args.get('policy')
         event_status = False
         req_url = get_dataserv() + "/_get_apps_db/?policy=" + policy_scope
-        saved_apps = requests.get(req_url, verify=False)
+        saved_apps = requests.get(req_url, verify=False).json()
         app_list = []
-        for app in saved_apps:
-            app_list.append(app['app'])
-        # return str(app_list)
+        for item in saved_apps:
+            app_list.append(item['app'])
         service_ticket = apic.get_ticket()
         return apic.put_policy_update(service_ticket,
                                       apic.update_app_state(service_ticket,
@@ -152,7 +150,7 @@ api.add_resource(CheckIsRelevant, '/_is_relevant/')
 api.add_resource(GetApps, '/_get_apps/')
 api.add_resource(SaveConfig, '/_save_config_db/')
 api.add_resource(EventOn,'/event/on/')
-api.add_resource(EventOff, '/event/off')
+api.add_resource(EventOff, '/event/off/')
 
 
 if __name__ == '__main__':
