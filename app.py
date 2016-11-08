@@ -28,6 +28,7 @@ api = Api(app)
 
 app.config.from_object(__name__)
 
+# default the data server to localhost to ease debugging
 app.config.update(dict(
     EDQOS_DATA_SERVER='localhost:5002'
 ))
