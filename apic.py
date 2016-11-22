@@ -134,7 +134,6 @@ def update_app_state(service_ticket, event_status, policy, app_list):
                                 policy['response'][i]['resource']['applications'].remove(app)
                                 print "Removed {0} from business-relevant".format(app_name)
                             else:
-                                print "not removed"
                                 continue
 
             else:
