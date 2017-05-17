@@ -8,6 +8,13 @@
     such as weather events, power excursions, etc.
 '''
 
+# To Do's:
+    # todo convert policy into class
+    # todo add method to modify policy
+    # todo convert REST API calls to use uniq? https://pypi.python.org/pypi/uniq/1.4.0.36
+    
+
+
 __author__ = 'sluzynsk'
 
 import requests
