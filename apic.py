@@ -12,7 +12,7 @@
     # todo convert policy into class
     # todo add method to modify policy
     # todo convert REST API calls to use uniq? https://pypi.python.org/pypi/uniq/1.4.0.36
-    
+
 
 
 __author__ = 'sluzynsk'
@@ -20,6 +20,8 @@ __author__ = 'sluzynsk'
 import requests
 import os
 import json
+from uniq.apis.nb.client_manager import NbClientManager
+
 
 # Define global variables
 if os.environ.get("APIC_SERVER"):
@@ -37,6 +39,11 @@ if os.environ.get("APIC_PASSWORD"):
 else:
     password='Cisco123!'
 
+client = NbClientManager(
+    server=apic,
+    username=username,
+    password=password,
+    connect=True)
 
 
 # Get the service ticket to be used in API calls
@@ -88,21 +95,21 @@ def get_app_state(policy, app_id, app_name):
 # Rewrites the policy based on the external event status; if no change is needed, returns false
 def update_app_state(service_ticket, event_status, policy, app_list):
     if event_status == True:
-        print "Event trigger ON"
+        print ("Event trigger ON")
         # Loop through each of the applications in the list of specified apps
         for app_name in app_list:
             i = 0
             app_id = get_app_id(service_ticket, app_name)
-            print "Looping in app list, appName={0}".format(app_name)
+            print("Looping in app list, appName={0}".format(app_name))
             if get_app_state(policy, app_id, app_name) != "Business-Relevant":
-                print "Only performing update if {0} is not already part of business-relevant".format(app_name)
+                print("Only performing update if {0} is not already part of business-relevant".format(app_name))
                 # Loop through each of the 3 policy entries from the policy scope
                 for i in range(len(policy['response'])):
                     a = 0
                     # If we are looking at the business-relevant policy, add the specified application
                     if policy['response'][i]['actionProperty']['relevanceLevel'] == "Business-Relevant":
                         policy['response'][i]['resource']['applications'].append({"id": app_id, "appName": app_name})
-                        print "Appended {0} to business-relevant".format(app_name)
+                        print("Appended {0} to business-relevant".format(app_name))
                     # If we are looking at the business-irrelevant (or default) policy, remove the specified application
                     else:
                         # Loop through each of the applications in the business-irrelevant policy
@@ -110,28 +117,28 @@ def update_app_state(service_ticket, event_status, policy, app_list):
                             # If app matches, delete from business-irrelevant, else continue looping applications
                             if app["appName"] == app_name:
                                 policy['response'][i]['resource']['applications'].remove(app)
-                                print "Removed {0} from business-irrelevant".format(app_name)
+                                print ("Removed {0} from business-irrelevant".format(app_name))
                             else:
                                 continue
             else:
                 continue
         return policy
     else:
-        print "Event trigger is OFF"
+        print ("Event trigger is OFF")
         # Loop through each of the applications in the list of specified apps
         for app_name in app_list:
             i = 0
             app_id = get_app_id(service_ticket, app_name)
-            print "looping in app list, appName={0}".format(app_name)
+            print ("looping in app list, appName={0}".format(app_name))
             if get_app_state(policy, app_id, app_name) != "Business-Irrelevant":
-                print "Only performing update if {0} is not already part of business-irrelevant".format(app_name)
+                print ("Only performing update if {0} is not already part of business-irrelevant".format(app_name))
                 # Loop through each of the 3 policy entries in the policy scope
                 for i in range(len(policy['response'])):
                     a = 0
                     # If we are looking at the business-irrelevant policy, add the specified application
                     if policy['response'][i]['actionProperty']['relevanceLevel'] == "Business-Irrelevant":
                         policy['response'][i]['resource']['applications'].append({"id": app_id, "appName": app_name})
-                        print "Appended {0} to business-irrelevant".format(app_name)
+                        print ("Appended {0} to business-irrelevant".format(app_name))
                     # If we are looking at the business-relevant (or default) policy, remove the specified application
                     else:
                         # Loop through each of the applications in the business-relevant (and default)
@@ -139,7 +146,7 @@ def update_app_state(service_ticket, event_status, policy, app_list):
                             #if app matches, delete from business-relevant, else continue looping applications
                             if app["appName"] == app_name:
                                 policy['response'][i]['resource']['applications'].remove(app)
-                                print "Removed {0} from business-relevant".format(app_name)
+                                print ("Removed {0} from business-relevant".format(app_name))
                             else:
                                 continue
 

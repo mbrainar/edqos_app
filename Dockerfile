@@ -1,7 +1,7 @@
 ##
 ## Dockerfile for Event Driven QoS
 ##
-FROM python:2-alpine
+FROM python:3-alpine
 MAINTAINER Steven Luzynski <sluzynsk@cisco.com>
 EXPOSE 5001
 
