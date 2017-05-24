@@ -21,6 +21,7 @@ import requests
 import os
 import json
 from uniq.apis.nb.client_manager import NbClientManager
+from login import login
 
 
 # Define global variables
@@ -39,11 +40,30 @@ if os.environ.get("APIC_PASSWORD"):
 else:
     password='Cisco123!'
 
-client = NbClientManager(
-    server=apic,
-    username=username,
-    password=password,
-    connect=True)
+# Create APIC EM object
+client = login()
+
+# Create Policy object
+class Policy(object):
+    """
+    Given an APIC EM session and policy scope, create a Policy object
+    """
+    def __init__(self, client, policy_scope):
+        self.client = client
+        self.policy_scope = policy_scope
+
+    # Create the PolicyListResult object based on the given policy scope
+    @property
+    def policy_list(self):
+        return self.client.policy.getFilterPolicies(policyScope=self.policy_scope)
+
+    # Get the relevanceLevel for a given app
+    def app_relevance(self, app_name):
+        for p in self.policy_list.response:
+            apps = [app for app in p.resource.applications if app.appName == app_name]
+            if len(apps) > 0:
+                print("Found application {} in {} policy".format(app_name, p.actionProperty.relevanceLevel))
+                return p.actionProperty.relevanceLevel
 
 
 # Get the service ticket to be used in API calls
@@ -101,7 +121,8 @@ def update_app_state(service_ticket, event_status, policy, app_list):
             i = 0
             app_id = get_app_id(service_ticket, app_name)
             print("Looping in app list, appName={0}".format(app_name))
-            if get_app_state(policy, app_id, app_name) != "Business-Relevant":
+            #if get_app_state(policy, app_id, app_name) != "Business-Relevant":
+            if Policy(client, "ed-qos").app_relevance(app_name) != "Business-Relevant":
                 print("Only performing update if {0} is not already part of business-relevant".format(app_name))
                 # Loop through each of the 3 policy entries from the policy scope
                 for i in range(len(policy['response'])):
@@ -188,19 +209,13 @@ def get_task(service_ticket, task_id):
 # Call API to get list of policy scopes
 # This is used to populate the UI
 def get_policy_scope(service_ticket):
-    reqUrl = "https://{0}/api/v1/policy/tag".format(apic)
-    header = {"X-Auth-Token": service_ticket}
+    client = login()
+    policy_tags_object = client.getPolicyTags().response
+    policy_tags_list = []
+    for tag in policy_tags_object.PolicyTag:
+        policy_tags_list.append(tag)
+    return policy_tags_list
 
-    r = requests.get(reqUrl, headers=header, verify=False)
-
-    if r.status_code == 200:
-        list = []
-        for scope in r.json()['response']:
-            list.append(scope['policyTag'])
-        list.sort(key=lambda y: y.lower())
-        return list
-    else:
-        r.raise_for_status()
 
 # Get list of all currently business irrelevant applications
 # This is used to populate the UI

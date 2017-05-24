@@ -20,6 +20,7 @@ import sqlite3
 import os
 import requests
 import json
+from login import login
 
 
 
@@ -61,16 +62,13 @@ class CheckIsRelevant(Resource):
     def get(self):
         app = request.args.get('app')
         policy_tag = request.args.get('policy')
-        ticket = apic.get_ticket()
-        app_id = apic.get_app_id(ticket, app)
-        policy = apic.get_policy(ticket, policy_tag)
-        return apic.get_app_state(policy, app_id, app)
+        return apic.Policy(login(), policy_tag).app_relevance(app)
 
 
 
 class GetPolicyScope(Resource):
     def get(self):
-        return apic.get_policy_scope(apic.get_ticket())
+        return apic.get_policy_scope()
 
 
 class GetApplications(Resource):
