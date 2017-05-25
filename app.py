@@ -16,11 +16,13 @@ from flask import request
 from flask import g
 from flask_restful import Resource, Api
 import apic
-import sqlite3
 import os
 import requests
-import json
 from login import login
+from apic import Policy
+from apic import get_policy_scope
+from apic import Applications
+
 
 
 
@@ -44,10 +46,13 @@ def get_dataserv():
         g.data_server = "http://" + app.config['EDQOS_DATA_SERVER']
     return g.data_server
 
-# These API calls retrieve information from the data/configuration
-# service.
+
+# These API calls retrieve information from the data/configuration service.
 
 class GetApps(Resource):
+    """
+    This will get the list of applications that have been selected and saved in the database
+    """
     def get(self):
         pol = request.args.get('policy')
         # get the app list from the data server
@@ -57,25 +62,6 @@ class GetApps(Resource):
 
 
 # These API calls retrieve information from the APIC-EM.
-
-class CheckIsRelevant(Resource):
-    def get(self):
-        app = request.args.get('app')
-        policy_tag = request.args.get('policy')
-        return apic.Policy(login(), policy_tag).app_relevance(app)
-
-
-
-class GetPolicyScope(Resource):
-    def get(self):
-        return apic.get_policy_scope()
-
-
-class GetApplications(Resource):
-    def get(self):
-        policy_tag = request.args.get('policy')
-        result = apic.get_applications(apic.get_ticket(), policy_tag)
-        return result
 
 
 # These API calls are used by the config/status UI to manipulate
@@ -130,22 +116,47 @@ class EventOff(Resource):
                                                             app_list),
                                       policy_scope)
 
+client = login()
 
-# Currently unused call to the weather plugin
+# Applications API class
+class GetApplications(Resource):
+    """
+    Get applications and returns as list
+    """
+    def get(self):
+        applications_object = Applications(client).applications
+        applications_list = [app.name for app in applications_object.response]
+        return applications_list
 
-@app.route('/weather/')
-def check_weather():
-    city = weather.getCity()
-    state = weather.getState()
-    temp = weather.getTemp(weather.getCurrentConditions())
-    weather_description = weather.getWeather(weather.getCurrentConditions())
-    weather_string = "The current weather in "+city+", "+state+" is "+str(temp)+" and "+weather_description
-    return weather_string
+# Policy Tags API class
+class GetPolicyTags(Resource):
+    """
+    Gets policy tags and returns as list
+    """
+    def get(self):
+        policy_tags_object = Policy(client).policy_tags
+        policy_tags_list = [tag.policyTag for tag in policy_tags_object.response]
+        return policy_tags_list
+
+# Application relevance API class
+class GetRelevance(Resource):
+    """
+    Checks current relevanceLevel of an app within a given policy scope
+    <url>/api/relevance/?policy=<policy scope>&app=<app name>
+    """
+    def get(self):
+        app_name = request.args.get('app')
+        policy_tag = request.args.get('policy')
+        return Policy(client).app_relevance(policy_tag, app_name)
 
 
-api.add_resource(GetApplications, '/_get_applications/')
-api.add_resource(GetPolicyScope, '/_get_policy_scope/')
-api.add_resource(CheckIsRelevant, '/_is_relevant/')
+
+# Create API resources
+api.add_resource(GetApplications, '/api/applications/')
+api.add_resource(GetPolicyTags, '/api/policy_tags/')
+api.add_resource(GetRelevance, '/api/relevance/')
+
+
 api.add_resource(GetApps, '/_get_apps/')
 api.add_resource(SaveConfig, '/_save_config_db/')
 api.add_resource(EventOn,'/event/on/')
