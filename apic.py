@@ -20,7 +20,6 @@ __author__ = 'sluzynsk'
 import requests
 import os
 import json
-from uniq.apis.nb.client_manager import NbClientManager
 from login import login
 
 
@@ -43,27 +42,74 @@ else:
 # Create APIC EM object
 client = login()
 
+# Create Applications object
+class Applications(object):
+    """
+    Given APIC EM session, create Applications object
+    """
+    def __init__(self, client):
+        self.client = client
+
+    @property
+    def applications(self):
+        return self.client.application.getFilterApplication()
+
+    def get_id(self, app_name):
+        _id = []
+        apps = [app for app in self.applications.response if app.name == app_name]
+        if len(apps) > 0:
+            return apps[0].id
+
 # Create Policy object
 class Policy(object):
     """
-    Given an APIC EM session and policy scope, create a Policy object
+    Given an APIC EM session, create a Policy object
     """
-    def __init__(self, client, policy_scope):
+    def __init__(self, client):
         self.client = client
-        self.policy_scope = policy_scope
+
+    # Create PolicyTags object
+    @property
+    def policy_tags(self):
+        return self.client.policy.getPolicyTags()
 
     # Create the PolicyListResult object based on the given policy scope
-    @property
-    def policy_list(self):
-        return self.client.policy.getFilterPolicies(policyScope=self.policy_scope)
+    def policy_list_for_scope(self, policy_scope):
+        return self.client.policy.getFilterPolicies(policyScope=policy_scope)
 
-    # Get the relevanceLevel for a given app
-    def app_relevance(self, app_name):
-        for p in self.policy_list.response:
+    # Get the relevanceLevel for a given app within a given policy scope
+    def app_relevance(self, policy_scope, app_name):
+        for p in self.policy_list_for_scope(policy_scope).response:
             apps = [app for app in p.resource.applications if app.appName == app_name]
             if len(apps) > 0:
                 print("Found application {} in {} policy".format(app_name, p.actionProperty.relevanceLevel))
                 return p.actionProperty.relevanceLevel
+
+    # Given app name and relevance level, reset relevance level
+    def reset_relevance(self, policy_scope, app_name, target_relevance):
+        _app = []
+        for p in self.policy_list_for_scope(policy_scope).response:
+            apps = [app for app in p.resource.applications if app.appName == app_name]
+            if len(apps) > 0:
+                if p.actionProperty.relevanceLevel == target_relevance:
+                    print("Application {} already in {} policy".format(app_name, p.actionProperty.relevanceLevel))
+                    return
+                else:
+                    print("Found application {} in {} policy".format(app_name, p.actionProperty.relevanceLevel))
+                    _app = apps[0]
+                    print("Removing application {}".format(app_name))
+                    p.resource.applications.remove(_app)
+            else:
+                if p.actionProperty.relevanceLevel == target_relevance:
+                    print("Found {} policy for policyScope {}".format(p.actionProperty.relevanceLevel, self.policy_scope))
+                    print("Adding application {}".format(_app.appName))
+                    p.resource.applications.append(_app)
+                else:
+                    print("Skipping {} policy".format(p.actionProperty.relevanceLevel))
+
+    # PUT the new policy
+    def update_apic(self):
+        self.client.policy.update(policyList=self.policy_list.response)
 
 
 # Get the service ticket to be used in API calls
@@ -208,8 +254,7 @@ def get_task(service_ticket, task_id):
 
 # Call API to get list of policy scopes
 # This is used to populate the UI
-def get_policy_scope(service_ticket):
-    client = login()
+def get_policy_scope():
     policy_tags_object = client.getPolicyTags().response
     policy_tags_list = []
     for tag in policy_tags_object.PolicyTag:
@@ -239,31 +284,3 @@ def get_applications(service_ticket, policy_scope):
     else:
         r.raise_for_status()
 
-# standard guard to make sure the application is only run if called as a script
-# as opposed to being imported i.e. for unit testing or linting.
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001)
-
-'''
-#Code test block
-apic="10.10.10.111"
-username="admin"
-password="1vtG@lw@y"
-
-policy_scope = "ed-qos"
-app_list = ["facebook"]
-service_ticket = get_ticket(username,password)
-
-#print get_app_state(get_policy(get_ticket(),policy_scope),get_app_id(get_ticket(),app_name),app_name)
-
-old = open("old.json", "w")
-new = open("new.json", "w")
-
-old.write(json.dumps(get_policy(service_ticket,policy_scope), indent=4))
-new.write(json.dumps(update_app_state(service_ticket,True,get_policy(service_ticket,policy_scope),app_list), indent=4))
-
-old.close()
-new.close()
-
-#print put_policy_update(service_ticket,update_app_state(service_ticket,False,get_policy(service_ticket,policy_scope),app_list),policy_scope)
-'''
