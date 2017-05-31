@@ -123,6 +123,23 @@ class Policy(object):
 
 
 
+    def find_app(self, app_name):
+        """
+            Finds the ApplicationDTO object for the app name
+
+            Args:
+                app_name: name of application to find (string)
+
+            Returns:
+                 ApplicationDTO (uniq model) and application relevance level (string)
+        """
+        _app = []
+        for p in self.policy_list.response:
+            apps = [app for app in p.resource.applications if app.appName == app_name]
+            if len(apps) > 0:
+                return apps[0]
+
+
     def reset_relevance(self, app_name, target_relevance):
         """
             Resets the relevance level for an application to the target level for the Policy object self
@@ -132,30 +149,32 @@ class Policy(object):
                 target_relevance: desired relevance level, string ["Business Relevant", "Default", "Business Irrelevant"]
         """
         # Check that target relevance is valid
-        valid_relevance = ["Business Relevant", "Default", "Business Irrelevant"]
+        valid_relevance = ["Business-Relevant", "Default", "Business-Irrelevant"]
         if target_relevance not in valid_relevance:
-            raise valueError("Invalid relevance")
+            raise ValueError("Invalid relevance")
 
-        # todo get applicationDTO object prior to making changes
+        # Find application ApplicationDTO and current relevance
+        _app = self.find_app(app_name)
+        _relevance = self.app_relevance(app_name)
 
-        _app = []
-        for p in self.policy_list.response:
-            apps = [app for app in p.resource.applications if app.appName == app_name]
-            if len(apps) > 0:
+        # If current relevance is target relevance print message and return None
+        if _relevance == target_relevance:
+            print("Application {} is already in {} policy".format(app_name, target_relevance))
+            return
+        else:
+            for p in self.policy_list.response:
                 if p.actionProperty.relevanceLevel == target_relevance:
-                    print("Application {} already in {} policy".format(app_name, p.actionProperty.relevanceLevel))
-                    return
-                else:
-                    print("Found application {} in {} policy".format(app_name, p.actionProperty.relevanceLevel))
-                    _app = apps[0]
-                    print("Removing application {}".format(app_name))
-                    p.resource.applications.remove(_app)
-            else:
-                if p.actionProperty.relevanceLevel == target_relevance:
-                    print("Found {} policy for policyScope {}".format(p.actionProperty.relevanceLevel, self.policy_scope))
-                    print("Adding application {}".format(_app.appName))
+                    # If looping through target relevance, append ApplicationDTO
+                    print("Adding application {} to {} policy".format(_app.appName, p.actionProperty.relevanceLevel))
                     p.resource.applications.append(_app)
+                elif p.actionProperty.relevanceLevel == _relevance:
+                    # If looping through current relevance, remove ApplicationDTO
+                    apps = [app for app in p.resource.applications if app.appName == app_name]
+                    if len(apps) > 0:
+                        print("Removing application {} from {} policy".format(app_name, p.actionProperty.relevanceLevel))
+                        p.resource.applications.remove(apps[0])
                 else:
+                    # Else, skip looping through policy
                     print("Skipping {} policy".format(p.actionProperty.relevanceLevel))
 
 
@@ -169,102 +188,3 @@ class Policy(object):
                 taskIdResult, uniq model
         """
         return self.client.policy.update(policyList=self.policy_list.response)
-
-
-
-
-# LEGACY Rewrites the policy based on the external event status; if no change is needed, returns false
-"""
-def update_app_state(service_ticket, event_status, policy, app_list):
-    if event_status == True:
-        print ("Event trigger ON")
-        # Loop through each of the applications in the list of specified apps
-        for app_name in app_list:
-            i = 0
-            app_id = get_app_id(service_ticket, app_name)
-            print("Looping in app list, appName={0}".format(app_name))
-            #if get_app_state(policy, app_id, app_name) != "Business-Relevant":
-            if Policy(client, "ed-qos").app_relevance(app_name) != "Business-Relevant":
-                print("Only performing update if {0} is not already part of business-relevant".format(app_name))
-                # Loop through each of the 3 policy entries from the policy scope
-                for i in range(len(policy['response'])):
-                    a = 0
-                    # If we are looking at the business-relevant policy, add the specified application
-                    if policy['response'][i]['actionProperty']['relevanceLevel'] == "Business-Relevant":
-                        policy['response'][i]['resource']['applications'].append({"id": app_id, "appName": app_name})
-                        print("Appended {0} to business-relevant".format(app_name))
-                    # If we are looking at the business-irrelevant (or default) policy, remove the specified application
-                    else:
-                        # Loop through each of the applications in the business-irrelevant policy
-                        for app in policy['response'][i]['resource']['applications']:
-                            # If app matches, delete from business-irrelevant, else continue looping applications
-                            if app["appName"] == app_name:
-                                policy['response'][i]['resource']['applications'].remove(app)
-                                print ("Removed {0} from business-irrelevant".format(app_name))
-                            else:
-                                continue
-            else:
-                continue
-        return policy
-    else:
-        print ("Event trigger is OFF")
-        # Loop through each of the applications in the list of specified apps
-        for app_name in app_list:
-            i = 0
-            app_id = get_app_id(service_ticket, app_name)
-            print ("looping in app list, appName={0}".format(app_name))
-            if get_app_state(policy, app_id, app_name) != "Business-Irrelevant":
-                print ("Only performing update if {0} is not already part of business-irrelevant".format(app_name))
-                # Loop through each of the 3 policy entries in the policy scope
-                for i in range(len(policy['response'])):
-                    a = 0
-                    # If we are looking at the business-irrelevant policy, add the specified application
-                    if policy['response'][i]['actionProperty']['relevanceLevel'] == "Business-Irrelevant":
-                        policy['response'][i]['resource']['applications'].append({"id": app_id, "appName": app_name})
-                        print ("Appended {0} to business-irrelevant".format(app_name))
-                    # If we are looking at the business-relevant (or default) policy, remove the specified application
-                    else:
-                        # Loop through each of the applications in the business-relevant (and default)
-                        for app in policy['response'][i]['resource']['applications']:
-                            #if app matches, delete from business-relevant, else continue looping applications
-                            if app["appName"] == app_name:
-                                policy['response'][i]['resource']['applications'].remove(app)
-                                print ("Removed {0} from business-relevant".format(app_name))
-                            else:
-                                continue
-
-            else:
-                continue
-        return policy
-
-# Call API to send the new policy to the APIC EM
-def put_policy_update(service_ticket, policy, policy_scope):
-    if policy != get_policy(service_ticket, policy_scope):
-        reqUrl = "https://{0}/api/v1/policy".format(apic)
-        header = {"X-Auth-Token": service_ticket, "Content-type":"application/json"}
-
-        r = requests.put(reqUrl, headers=header, json=policy['response'], verify=False)
-
-        if r.status_code == 202:
-            task_id = r.json()['response']['taskId']
-            if get_task(service_ticket, task_id)['response']['isError'] == False:
-                return "taskId {0} completed without errors".format(task_id)
-            else:
-                return "taskId {0} failed with errors".format(task_id)
-        else:
-            r.raise_for_status()
-    else:
-        return "No changes made to policy"
-
-# Call API to get the details of the taskId created by APIC EM when sending policy changes
-def get_task(service_ticket, task_id):
-    reqUrl = "https://{0}/api/v1/task/{1}".format(apic, task_id)
-    header = {"X-Auth-Token": service_ticket, "Content-type": "application/json"}
-
-    r = requests.get(reqUrl, headers=header, verify=False)
-
-    if r.status_code == 200:
-        return r.json()
-    else:
-        r.raise_for_status()
-"""
