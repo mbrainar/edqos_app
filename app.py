@@ -101,7 +101,7 @@ class PolicyTagsAPI(Resource):
                 list of policy tags, 200 status code, access-control header
         """
         policy_tags_object = Policy(client, None).policy_tags
-        policy_tags_list = [tag.PolicyTag for tag in policy_tags_object.response]
+        policy_tags_list = [tag.policyTag for tag in policy_tags_object.response]
         # policy_tags_list = [client.serialize(tag) for tag in policy_tags_object.response]
         return policy_tags_list, 200, {'Access-Control-Allow-Origin': '*'}
 
@@ -138,13 +138,21 @@ class RelevanceAPI(Resource):
             Returns:
                 taskId object (from uniq)
         """
-        app_name = request.form.getlist('app')
-        policy_tag = request.form.getlist('policy')
-        target_relevance = request.form.getlist('relevance')
+        app_name = request.form['app']
+        policy_tag = request.form['policy']
+        target_relevance = request.form['relevance']
         policy_object = Policy(client, policy_tag)
-        policy_object.reset_relevance(app_name, target_relevance)
-        return policy_object.update_apic(), 200, {'Access-Control-Allow-Origin': '*'}
-
+        if policy_object.app_relevance(app_name) == target_relevance:
+            print("Application {} is already in {} policy".format(app_name, target_relevance))
+            return "Application {} is already in {} policy".format(app_name, target_relevance), 200, {'Access-Control-Allow-Origin': '*'}
+        else:
+            policy_object.reset_relevance(app_name, target_relevance)
+            print(client.serialize(policy_object.policy_list.response))
+            # for p in policy_object.policy_list.response:
+            #     print(p.actionProperty.relevanceLevel)
+            #     for a in p.resource.applications:
+            #         print(a.appName)
+            return policy_object.update_apic().response.taskId, 200, {'Access-Control-Allow-Origin': '*'}
 
 
 
