@@ -11,13 +11,7 @@
 
 __author__ = 'mbrainar'
 
-import requests
-from login import login
-
-
-
-# Create APIC EM object
-# client = login()
+import json
 
 
 
@@ -64,8 +58,7 @@ class Applications(object):
 
 
 
-
-
+# Create the Policy object
 class Policy(object):
 
     def __init__(self, client, policy_scope):
@@ -80,6 +73,10 @@ class Policy(object):
         self.policy_scope = policy_scope
 
 
+        # Create PolicyListResults (uniq model) object
+        self.policy_list = self.client.policy.getFilterPolicies(policyScope=self.policy_scope)
+
+
 
     @property
     def policy_tags(self):
@@ -90,18 +87,6 @@ class Policy(object):
                 PolicyTagResult, uniq model
         """
         return self.client.policy.getPolicyTags()
-
-
-
-    @property
-    def policy_list(self):
-        """
-            Creates policy lists object using policy scope in self
-
-            Returns:
-                 PolicyListResults, uniq model
-        """
-        return self.client.policy.getFilterPolicies(policyScope=self.policy_scope)
 
 
 
@@ -125,19 +110,20 @@ class Policy(object):
 
     def find_app(self, app_name):
         """
-            Finds the ApplicationDTO object for the app name
+            Finds the PolicyApplication object for the app name
 
             Args:
                 app_name: name of application to find (string)
 
             Returns:
-                 ApplicationDTO (uniq model) and application relevance level (string)
+                 PolicyApplication (uniq model)
         """
-        _app = []
+        self._app = None
         for p in self.policy_list.response:
             apps = [app for app in p.resource.applications if app.appName == app_name]
             if len(apps) > 0:
                 return apps[0]
+
 
 
     def reset_relevance(self, app_name, target_relevance):
@@ -153,8 +139,11 @@ class Policy(object):
         if target_relevance not in valid_relevance:
             raise ValueError("Invalid relevance")
 
-        # Find application ApplicationDTO and current relevance
+        # Find the PolicyApplication object (uniq model) for the app_name
         _app = self.find_app(app_name)
+        # DEBUG prints PolicyApplication object matching app_name
+        # print(self.client.serialize(_app))
+
         _relevance = self.app_relevance(app_name)
 
         # If current relevance is target relevance print message and return None
@@ -167,12 +156,16 @@ class Policy(object):
                     # If looping through target relevance, append ApplicationDTO
                     print("Adding application {} to {} policy".format(_app.appName, p.actionProperty.relevanceLevel))
                     p.resource.applications.append(_app)
+
+                    # DEBUG prints newly modified applications list for target relevance level
+                    # print(json.dumps(self.client.serialize(p.resource.applications),indent=4))
                 elif p.actionProperty.relevanceLevel == _relevance:
                     # If looping through current relevance, remove ApplicationDTO
-                    apps = [app for app in p.resource.applications if app.appName == app_name]
-                    if len(apps) > 0:
-                        print("Removing application {} from {} policy".format(app_name, p.actionProperty.relevanceLevel))
-                        p.resource.applications.remove(apps[0])
+                    print("Removing application {} from {} policy".format(app_name, p.actionProperty.relevanceLevel))
+                    p.resource.applications.remove(_app)
+
+                    # DEBUG prints newly modified applications list for previous relevance level
+                    # print(json.dumps(self.client.serialize(p.resource.applications),indent=4))
                 else:
                     # Else, skip looping through policy
                     print("Skipping {} policy".format(p.actionProperty.relevanceLevel))
