@@ -93,7 +93,12 @@ class RelevanceAPI(Resource):
         """
         app_name = request.args.get('app')
         policy_tag = request.args.get('policy')
-        return Policy(client, policy_tag).app_relevance(app_name), 200, {'Access-Control-Allow-Origin': '*'}
+        if not app_name:
+            return "Missing Argument: app", 400, {'Access-Control-Allow-Origin': '*'}
+        elif not policy_tag:
+            return "Missing Argument: policy", 400, {'Access-Control-Allow-Origin': '*'}
+        else:
+            return Policy(client, policy_tag).app_relevance(app_name), 200, {'Access-Control-Allow-Origin': '*'}
 
     def post(self):
         """
@@ -113,6 +118,13 @@ class RelevanceAPI(Resource):
         app_name = request.form['app']
         policy_tag = request.form['policy']
         target_relevance = request.form['relevance']
+
+        if not app_name:
+            return "Missing Form Parameter: app", 400, {'Access-Control-Allow-Origin': '*'}
+        elif not policy_tag:
+            return "Missing Form Parameter: policy", 400, {'Access-Control-Allow-Origin': '*'}
+        elif not target_relevance:
+            return "Missing Form Parameter: relevance", 400, {'Access-Control-Allow-Origin': '*'}
 
         # Create Policy object
         policy_object = Policy(client, policy_tag)
