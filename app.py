@@ -26,10 +26,6 @@ app.config.from_object(__name__)
 
 
 
-# Create NbClientManager object for uniq library
-client = login()
-
-
 # Applications API class
 class ApplicationsAPI(Resource):
 
@@ -43,6 +39,9 @@ class ApplicationsAPI(Resource):
             Returns:
                 list of applications, 200 status code, access-control header
         """
+        # Create NbClientManager object for uniq library
+        client = login()
+
         applications_object = Applications(client).applications
 
         # Return only the list of application names
@@ -67,6 +66,9 @@ class PolicyTagsAPI(Resource):
             Returns:
                 list of policy tags, 200 status code, access-control header
         """
+        # Create NbClientManager object for uniq library
+        client = login()
+
         policy_tags_object = Policy(client, None).policy_tags
 
         # Return only the list of policy tags
@@ -91,6 +93,9 @@ class RelevanceAPI(Resource):
             Returns:
                 String representation of relevance level, 200 status code, access-control header
         """
+        # Create NbClientManager object for uniq library
+        client = login()
+
         app_name = request.args.get('app')
         policy_tag = request.args.get('policy')
         if not app_name:
@@ -115,6 +120,9 @@ class RelevanceAPI(Resource):
             Returns:
                 taskId object (from uniq)
         """
+        # Create NbClientManager object for uniq library
+        client = login()
+
         app_name = request.form['app']
         policy_tag = request.form['policy']
         target_relevance = request.form['relevance']
