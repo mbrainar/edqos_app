@@ -15,6 +15,7 @@ from login import login
 from apic import Policy
 from apic import Applications
 import json
+import re
 
 
 
@@ -34,7 +35,10 @@ class ApplicationsAPI(Resource):
             Get applications and returns as list
 
             Usage:
-                http://<url>/api/applications/
+                http://<url>/api/applications/?search=<search string>
+
+            Args:
+                search: application name search query (string)
 
             Returns:
                 list of applications, 200 status code, access-control header
@@ -42,10 +46,19 @@ class ApplicationsAPI(Resource):
         # Create NbClientManager object for uniq library
         client = login()
 
+        try:
+            search = request.args.get('search')
+        except:
+            search = None
+
         applications_object = Applications(client).applications
 
-        # Return only the list of application names
-        applications_list = [app.name for app in applications_object.response]
+        if search:
+            rsearch = re.compile(search, re.IGNORECASE)
+            applications_list = [app.name for app in applications_object.response if rsearch.search(app.name)]
+        else:
+            # Return only the list of application names
+            applications_list = [app.name for app in applications_object.response]
 
         # Optionally return the entire ApplicationsListResult object in JSON
         # applications_list = [client.serialize(app) for app in applications_object.response]
@@ -89,6 +102,10 @@ class RelevanceAPI(Resource):
 
             Usage:
                 http://<url>/api/relevance/?policy=<policy scope>&app=<app name>
+
+            Args:
+                app_name: Application name (string)
+                policy: Policy Scope
 
             Returns:
                 String representation of relevance level, 200 status code, access-control header
