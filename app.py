@@ -158,7 +158,7 @@ class RelevanceAPI(Resource):
             # If current relevance is target relevance print and return message
             message = "Application {} is already in {} policy".format(app_name, target_relevance)
             print(message)
-            return message, 200, {'Access-Control-Allow-Origin': '*'}
+            return message, 204, {'Access-Control-Allow-Origin': '*'}
 
         else:
             # Execute the change to the application's relevance level
