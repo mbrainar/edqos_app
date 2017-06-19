@@ -120,7 +120,10 @@ class RelevanceAPI(Resource):
         elif not policy_tag:
             return "Missing Argument: policy", 400, {'Access-Control-Allow-Origin': '*'}
         else:
-            return Policy(client, policy_tag).app_relevance(app_name), 200, {'Access-Control-Allow-Origin': '*'}
+            relevance = Policy(client, policy_tag).app_relevance(app_name)
+            if not relevance:
+                return "Unable to get relevance level", 204, {'Access-Control-Allow-Origin': '*'}
+            return relevance, 200, {'Access-Control-Allow-Origin': '*'}
 
     def post(self):
         """
@@ -169,7 +172,10 @@ class RelevanceAPI(Resource):
             #     p.write(json.dumps(client.serialize(policy_object.policy_list.response),indent=4))
 
             # Update the APIC EM policy via REST API PUT (using uniq wrapper), return taskId response
-            return policy_object.update_apic().response.taskId, 200, {'Access-Control-Allow-Origin': '*'}
+            task_id = policy_object.update_apic().response.taskId
+            if task_id:
+                message = "Success: {} set to relevance level {}".format(app_name, target_relevance)
+                return message, 200, {'Access-Control-Allow-Origin': '*'}
 
 
 
