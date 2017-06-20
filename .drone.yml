@@ -11,6 +11,15 @@ publish:
     username: $$DOCKER_USERNAME
     password: $$DOCKER_PASSWORD
     email: $$DOCKER_EMAIL
+    when:
+      branch: "master"
+
+  docker:
+    repo: $$DOCKER_USERNAME/edqos_app
+    tag: $${BRANCH##feature/}
+    username: $$DOCKER_USERNAME
+    password: $$DOCKER_PASSWORD
+    email: $$DOCKER_EMAIL
 
 
 deploy:
@@ -22,7 +31,21 @@ deploy:
       username: $$MANTL_USERNAME
       password: $$MANTL_PASSWORD
     urls:
-      - https://$$MANTL_CONTROL/marathon/v2/apps/edqos/$$DOCKER_USERNAME/app/restart?force=true
+      - https://$$MANTL_CONTROL/marathon/v2/apps/imapex/edqos/$$DOCKER_USERNAME/app/restart?force=true
+    when:
+      branch: "master"
+
+    webhook:
+    image: plugins/drone-webhook
+    skip_verify: true
+    method: POST
+    auth:
+      username: $$MANTL_USERNAME
+      password: $$MANTL_PASSWORD
+    urls:
+      - https://$$MANTL_CONTROL/marathon/v2/apps/imapex/edqos/$$DOCKER_USERNAME/app-dev/restart?force=true
+    when:
+      branch: "python3"
 
 notify:
   spark:

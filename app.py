@@ -5,153 +5,185 @@
     such as weather events, power excursions, etc.
 '''
 
-__author__ = 'sluzynsk'
+__author__ = 'mbrainar'
 
 from flask import Flask
-from flask import render_template
-from flask import redirect
-from flask import url_for
-from flask import jsonify
 from flask import request
-from flask import g
-from flask_restful import Resource, Api
-import apic
-import sqlite3
-import os
-import requests
+from flask_restful import Resource
+from flask_restful import Api
+from login import login
+from apic import Policy
+from apic import Applications
 import json
+import re
 
 
 
+# Create flask app and flask_restful api
 app = Flask(__name__)
 api = Api(app)
 
 app.config.from_object(__name__)
 
-# default the data server to localhost to ease debugging
-app.config.update(dict(
-    EDQOS_DATA_SERVER='localhost:5002'
-))
 
-if os.environ.get("EDQOS_DATA_SERVER"):
-    app.config.update(dict(
-        EDQOS_DATA_SERVER=os.environ.get("EDQOS_DATA_SERVER")
-    ))
 
-def get_dataserv():
-    if not hasattr(g, 'data_server'):
-        g.data_server = "http://" + app.config['EDQOS_DATA_SERVER']
-    return g.data_server
+# Applications API class
+class ApplicationsAPI(Resource):
 
-# These API calls retrieve information from the data/configuration
-# service.
-
-class GetApps(Resource):
     def get(self):
-        pol = request.args.get('policy')
-        # get the app list from the data server
-        req_url = get_dataserv() + "/_get_apps_db/?policy=" + pol
-        entries = requests.get(req_url)
-        return entries.json()
+        """
+            Get applications and returns as list
+
+            Usage:
+                http://<url>/api/applications/?search=<search string>
+
+            Args:
+                search: application name search query (string)
+
+            Returns:
+                list of applications, 200 status code, access-control header
+        """
+        # Create NbClientManager object for uniq library
+        client = login()
+
+        try:
+            search = request.args.get('search')
+        except:
+            search = None
+
+        applications_object = Applications(client).applications
+
+        if search:
+            rsearch = re.compile(search, re.IGNORECASE)
+            applications_list = [app.name for app in applications_object.response if rsearch.search(app.name)]
+        else:
+            # Return only the list of application names
+            applications_list = [app.name for app in applications_object.response]
+
+        # Optionally return the entire ApplicationsListResult object in JSON
+        # applications_list = [client.serialize(app) for app in applications_object.response]
+
+        return applications_list, 200, {'Access-Control-Allow-Origin': '*'}
 
 
-# These API calls retrieve information from the APIC-EM.
+# Policy Tags API class
+class PolicyTagsAPI(Resource):
 
-class CheckIsRelevant(Resource):
     def get(self):
-        app = request.args.get('app')
+        """
+            Gets policy tags and returns as list
+
+            Usage:
+                http://<url>/api/policy_tags/
+
+            Returns:
+                list of policy tags, 200 status code, access-control header
+        """
+        # Create NbClientManager object for uniq library
+        client = login()
+
+        policy_tags_object = Policy(client, None).policy_tags
+
+        # Return only the list of policy tags
+        policy_tags_list = [tag.policyTag for tag in policy_tags_object.response]
+
+        # Optionally return the entire PolicyTagListResult object in JSON
+        # policy_tags_list = [client.serialize(tag) for tag in policy_tags_object.response]
+
+        return policy_tags_list, 200, {'Access-Control-Allow-Origin': '*'}
+
+
+# Application relevance API class
+class RelevanceAPI(Resource):
+
+    def get(self):
+        """
+            Checks current relevanceLevel of an app within a given policy scope
+
+            Usage:
+                http://<url>/api/relevance/?policy=<policy scope>&app=<app name>
+
+            Args:
+                app_name: Application name (string)
+                policy: Policy Scope
+
+            Returns:
+                String representation of relevance level, 200 status code, access-control header
+        """
+        # Create NbClientManager object for uniq library
+        client = login()
+
+        app_name = request.args.get('app')
         policy_tag = request.args.get('policy')
-        ticket = apic.get_ticket()
-        app_id = apic.get_app_id(ticket, app)
-        policy = apic.get_policy(ticket, policy_tag)
-        return apic.get_app_state(policy, app_id, app)
+        if not app_name:
+            return "Missing Argument: app", 400, {'Access-Control-Allow-Origin': '*'}
+        elif not policy_tag:
+            return "Missing Argument: policy", 400, {'Access-Control-Allow-Origin': '*'}
+        else:
+            relevance = Policy(client, policy_tag).app_relevance(app_name)
+            if not relevance:
+                return "Unable to get relevance level", 204, {'Access-Control-Allow-Origin': '*'}
+            return relevance, 200, {'Access-Control-Allow-Origin': '*'}
 
-
-
-class GetPolicyScope(Resource):
-    def get(self):
-        return apic.get_policy_scope(apic.get_ticket())
-
-
-class GetApplications(Resource):
-    def get(self):
-        policy_tag = request.args.get('policy')
-        result = apic.get_applications(apic.get_ticket(), policy_tag)
-        return result
-
-
-# These API calls are used by the config/status UI to manipulate
-# app state and the configuration.
-
-class SaveConfig(Resource):
     def post(self):
-        applist = request.form.getlist('selections')
-        policy_tag = request.form.getlist('policy_tag')[0]
-        apps = applist[0].split(",")
-        # map this to the data server
-        req_url = get_dataserv() + "/_save_config_db/"
-        payload = { "selections": applist,
-                    "policy_tag": policy_tag }
-        response = requests.post(req_url, data=payload)
-        return
+        """
+            Sets the relevance level for the provided application name to the
+
+            Usage:
+                http://<url>/api/relevance/
+
+            Payload params:
+                app: application name that is being set
+                policy: policy scope that is being modified
+                relevance: target relevance level, to which the application is being set
+
+            Returns:
+                taskId object (from uniq)
+        """
+        # Create NbClientManager object for uniq library
+        client = login()
+
+        app_name = request.form['app']
+        policy_tag = request.form['policy']
+        target_relevance = request.form['relevance']
+
+        if not app_name:
+            return "Missing Form Parameter: app", 400, {'Access-Control-Allow-Origin': '*'}
+        elif not policy_tag:
+            return "Missing Form Parameter: policy", 400, {'Access-Control-Allow-Origin': '*'}
+        elif not target_relevance:
+            return "Missing Form Parameter: relevance", 400, {'Access-Control-Allow-Origin': '*'}
+
+        # Create Policy object
+        policy_object = Policy(client, policy_tag)
+
+        if policy_object.app_relevance(app_name) == target_relevance:
+            # If current relevance is target relevance print and return message
+            message = "Application {} is already in {} policy".format(app_name, target_relevance)
+            print(message)
+            return message, 204, {'Access-Control-Allow-Origin': '*'}
+
+        else:
+            # Execute the change to the application's relevance level
+            policy_object.reset_relevance(app_name, target_relevance)
+
+            # DEBUG printing of output for troubleshooting
+            # with open('file.txt', 'w') as p:
+            #     p.write(json.dumps(client.serialize(policy_object.policy_list.response),indent=4))
+
+            # Update the APIC EM policy via REST API PUT (using uniq wrapper), return taskId response
+            task_id = policy_object.update_apic().response.taskId
+            if task_id:
+                message = "Success: {} set to relevance level {}".format(app_name, target_relevance)
+                return message, 200, {'Access-Control-Allow-Origin': '*'}
 
 
 
-class EventOn(Resource):
-    def get(self):
-        policy_scope = request.args.get('policy')
-        event_status = True
-        req_url = get_dataserv() + "/_get_apps_db/?policy=" + policy_scope
-        saved_apps = requests.get(req_url, verify=False).json()
-        app_list = []
-        for item in saved_apps:
-            app_list.append(item['app'])
-        service_ticket = apic.get_ticket()
-        return apic.put_policy_update(service_ticket,
-                                      apic.update_app_state(service_ticket,
-                                                            event_status,
-                                                            apic.get_policy(service_ticket, policy_scope),
-                                                            app_list),
-                                      policy_scope)
+# Create flask_restful API resources
+api.add_resource(ApplicationsAPI, '/api/applications/')
+api.add_resource(PolicyTagsAPI, '/api/policy_tags/')
+api.add_resource(RelevanceAPI, '/api/relevance/')
 
-
-class EventOff(Resource):
-    def get(self):
-        policy_scope = request.args.get('policy')
-        event_status = False
-        req_url = get_dataserv() + "/_get_apps_db/?policy=" + policy_scope
-        saved_apps = requests.get(req_url, verify=False).json()
-        app_list = []
-        for item in saved_apps:
-            app_list.append(item['app'])
-        service_ticket = apic.get_ticket()
-        return apic.put_policy_update(service_ticket,
-                                      apic.update_app_state(service_ticket,
-                                                            event_status,
-                                                            apic.get_policy(service_ticket, policy_scope),
-                                                            app_list),
-                                      policy_scope)
-
-
-# Currently unused call to the weather plugin
-
-@app.route('/weather/')
-def check_weather():
-    city = weather.getCity()
-    state = weather.getState()
-    temp = weather.getTemp(weather.getCurrentConditions())
-    weather_description = weather.getWeather(weather.getCurrentConditions())
-    weather_string = "The current weather in "+city+", "+state+" is "+str(temp)+" and "+weather_description
-    return weather_string
-
-
-api.add_resource(GetApplications, '/_get_applications/')
-api.add_resource(GetPolicyScope, '/_get_policy_scope/')
-api.add_resource(CheckIsRelevant, '/_is_relevant/')
-api.add_resource(GetApps, '/_get_apps/')
-api.add_resource(SaveConfig, '/_save_config_db/')
-api.add_resource(EventOn,'/event/on/')
-api.add_resource(EventOff, '/event/off/')
 
 
 if __name__ == '__main__':

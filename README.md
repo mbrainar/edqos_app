@@ -16,14 +16,9 @@ external event, such as breaking news events, trending social media keywords, et
 
 Prerequisites
 
-* Python 2.7+
-* [setuptools package](https://pypi.python.org/pypi/setuptools)
-* [Flask](http://flask.pocoo.org)
-* [Requests](http://docs.python-requests.org/en/master/)
+* Python 3
+* `pip install -r requirements.txt`
 
-The front end application makes use of [JQuery](http://jquery.com) and [Chosen](https://harvesthq.github.io/chosen/);
-separate installation of these libraries is not required as they are linked from
-public CDN networks.
 
 ## Downloading
 
@@ -31,73 +26,65 @@ Option A:
 
 If you have git installed, clone the repository
 
-    git clone https://github.com/imapex/ed-qos
+    git clone https://github.com/imapex/edqos_app
 
 Option B:
 
-If you don't have git, [download a zip copy of the repository](https://github.com/imapex/ed-qos/archive/master.zip)
+If you don't have git, [download a zip copy of the repository](https://github.com/imapex/edqos_app/archive/master.zip)
 and extract.
 
-Option C:
-
-The latest build of this project is also available as a Docker image from Docker Hub
-
-    docker pull imapex/ed-qos:latest
 
 ## Installing
 
-To install the application, edit the sample-demoapp.json file (included) to
-reflect credentials for your Cisco APIC-EM installation. Run the app_install.sh
-script to install the application to your [mantl](http://mantl.io) server.
+### DevNet Mantl Sandbox
+To install the application to the DevNet Mantl Sandbox using the DevNet APIC EM Sandbox:
+1. Set your docker username
+    ```
+    export $DOCKERUSER=<your_username>
+    ```
+2. Execute the following commands
+    ```    
+    cp edqos_sample.json edqos_$DOCKERUSER.json
+    sed -i "" -e "s/DOCKERUSER/$DOCKERUSER/g" edqos_$DOCKERUSER.json
+    curl -k -X POST -u admin:1vtG@lw@y https://mantlsandbox.cisco.com:8080/v2/apps \
+    -H "Content-type: application/json" \
+    -d @edqos_$DOCKERUSER.json \
+    | python -m json.tool
+    ```
+
+### BYOMantl
+You can modify the sample app definition and commands above to deploy to your own Mantl instance.
+  
+### Local Container
+You can run docker container 
+
+### Local Deployment
+You can also run the application locally rather than in a container environment by the following:
+
+```
+python app.py
+```
 
 # Usage
 
-The application provides a web interface for status reporting and configuration.
-That interface will be available after the application is deployed.
+The application provides an API interface for getting QOS information out of APIC EM.
 
-Currently, the only external event source implemented is a click on that web
-interface. The next release will support incoming events from event modules.
-Planned event modules include integration with weather and social media.
+The supported APIs are:
+* /api/policy_tags/ - (GET) Responds with list of policy tags available in APIC EM
+* /api/applications/ - (GET) Responds with list of applications known to APIC EM
+    * Optional argument: `search=<string>` Responds with list of applications matching search string
+* /api/relevance/ - (GET) Responds with current relevance level for an application within a given scope
+    * Required argument: `app=<string>` needs exact application name as known by APIC EM
+    * Required argument: `policy=<string>` needs exact policy tag as known by APIC EM
+* /api/relevance/ - (POST) Sets the given application to the given relevance level; takes application/x-www-form-urlencoded data
+    * Required data: `app=<string>` needs exact application name as known by APIC EM 
+    * Required data: `policy=<string>` needs exact policy tag as known by APIC EM
+    * Required data: `relevance=<string>` needs exact relevance level as known by APIC EM
+    ("Business-Relevant", "Default", "Business-Irrelevant")
+    
+    
 
 # Development
 
 Development requires access to Cisco's DevNet sandbox APIC-EM server, or a suitable
-on-site installation. The application can be run locally rather than in a container
-environment by the following:
-
-    export FLASK_APP=app.py
-    flask initdb (on first launch to initialize a local database)
-    flask run
-
-
-## Linting
-
-We use flake 8 to lint our code. Please keep the repository clean by running:
-
-    flake8
-
-## Testing
-
-Currently test coverage is lacking for this application.
-
-The tests are can be run in the following ways::
-
-    python tests.py
-
-
-When adding additional code or making changes to the project, please ensure that unit tests are added to cover the
-new functionality and that the entire test suite is run against the project before submitting the code.
-Minimal code coverage can be verified using tools such as coverage.py.
-
-For instance, after installing coverage.py, the toolkit can be run with the command::
-
-    coverage run tests.py
-
-and an HTML report of the code coverage can be generated with the command::
-
-    coverage html
-
-
-# License
-
-Include any applicable licenses here as well as LICENSE.TXT in the root of the repository
+on-site installation. 
