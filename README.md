@@ -54,9 +54,6 @@ To install the application to the DevNet Mantl Sandbox using the DevNet APIC EM 
 
 ### BYOMantl
 You can modify the sample app definition and commands above to deploy to your own Mantl instance.
-  
-### Local Container
-You can run docker container 
 
 ### Local Deployment
 You can also run the application locally rather than in a container environment by the following:
@@ -87,4 +84,4 @@ The supported APIs are:
 # Development
 
 Development requires access to Cisco's DevNet sandbox APIC-EM server, or a suitable
-on-site installation. 
+on-site installation. Send us a Pull Request with suggested changes.
