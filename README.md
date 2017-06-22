@@ -1,14 +1,22 @@
-# Event Driven QoS
+# Event Driven QoS 1.0
 
 # Description
 
 Event Driven QoS is a simple demo application illustrating programmatic control of APIC-EM to change
-QoS parameters in an attached network. This is driven by an external event. In the initial implementation,
-the application will promote facebook traffic when an event is detected; the inspiration came from
-Facebook's ability to "check in" as "safe" in the event of a catastrophic event. In the initial implementation,
-the event trigger is a static URL call. The application could potentially allow for the trigger to be an
-external event, such as breaking news events, trending social media keywords, etc.
+QoS parameters in an attached network. This is driven by an external event.
 
+There are three containers involved in the delivery of the application:
+* edqos_app (this container) - responsible for presenting API calls for external events to
+toggle the status of configured applications.
+* edqos_data - implements an abstraction layer over the configuration database.
+Currently implemented as SQLite and lacking in persistence between launches of
+the container.
+* edqos_web - front end application for configuration and status reporting. Includes
+manual event triggers to confirm proper functioning of the application.
+
+Additionally, an optional installation repository is available as edqos_installer.
+This repository includes scripts for installation into an instance of [mantl](http://mantl.io)
+as well as a [docker-compose](http://docker.com) script.
 
 # Installation
 
@@ -16,17 +24,20 @@ external event, such as breaking news events, trending social media keywords, et
 
 Prerequisites
 
+
 * Python 3
 * `pip install -r requirements.txt`
+
 
 
 ## Downloading
 
 Option A:
 
-If you have git installed, clone the repository
+If you have git installed, clone the repositories into the same directory.
 
     git clone https://github.com/imapex/edqos_app
+
 
 Option B:
 
@@ -34,7 +45,9 @@ If you don't have git, [download a zip copy of the repository](https://github.co
 and extract.
 
 
+
 ## Installing
+
 
 ### DevNet Mantl Sandbox
 To install the application to the DevNet Mantl Sandbox using the DevNet APIC EM Sandbox:
@@ -80,6 +93,7 @@ The supported APIs are:
     ("Business-Relevant", "Default", "Business-Irrelevant")
     
     
+
 
 # Development
 
