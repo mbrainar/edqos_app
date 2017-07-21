@@ -81,6 +81,7 @@ celerybeat-schedule
 # virtualenv
 venv/
 ENV/
+venv3/
 
 # Spyder project settings
 .spyderproject
@@ -99,4 +100,3 @@ drone_secrets.yml
 
 # don't store databases
 edqos.db
-
