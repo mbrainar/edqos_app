@@ -25,7 +25,10 @@ api = Api(app)
 
 app.config.from_object(__name__)
 
-
+# Create "/" app route
+@app.route("/")
+def health_check():
+    return "Healthy"
 
 # Applications API class
 class ApplicationsAPI(Resource):
